@@ -25,7 +25,7 @@ export default function App() {
     return (
       <>
         <Navbar activePage={activePage} setActivePage={setActivePage} isMobile />
-        <Hero />
+        <Hero setActivePage={setActivePage} />
         <Stats />
         <Courses />
         <Faculty />
@@ -40,7 +40,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'home': return <><Hero /><Stats /></>;
+      case 'home': return <><Hero setActivePage={setActivePage} /><Stats /></>;
       case 'courses': return <Courses fullPage />;
       case 'faculty': return <Faculty fullPage />;
       case 'results': return <Results fullPage />;

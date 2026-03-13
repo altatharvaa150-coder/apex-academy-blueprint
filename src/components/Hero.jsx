@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { getHero, saveHero } from '../store/academyData';
-import { Medal, Star, ShieldCheck, ArrowRight, Play, Edit2 } from 'lucide-react';
+import { Medal, Star, ShieldCheck, ArrowRight, Play, Edit2, Upload } from 'lucide-react';
 
-export default function Hero() {
+export default function Hero({ setActivePage }) {
   const { isAdmin } = useAdmin();
   const [hero, setHero] = useState(getHero());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(hero);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    setHero(getHero());
+    const stored = getHero();
+    setHero(stored);
+    setDraft(stored);
   }, []);
 
   const handleSave = () => {
@@ -19,19 +22,42 @@ export default function Hero() {
     setEditing(false);
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setDraft({ ...draft, heroImage: ev.target.result });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openEdit = () => {
+    setDraft(hero);
+    setEditing(true);
+  };
+
+  const navigateTo = (page) => {
+    if (setActivePage) setActivePage(page);
+    else {
+      const el = document.getElementById(page);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <>
       <section className="hero-section" id="home">
         <div className="bg-noise"></div>
-        
+
         {/* Announcement banner */}
         <div className="announcement-bar">
           <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
             <span className="announcement-dot" />
             <span>{hero.announcement}</span>
             {isAdmin && (
-              <button className="admin-badge" onClick={() => setEditing(true)}>
-                <Edit2 size={12} /> Edit Banner
+              <button className="admin-badge" onClick={openEdit}>
+                <Edit2 size={12} /> Edit Hero
               </button>
             )}
           </div>
@@ -48,12 +74,12 @@ export default function Hero() {
             <p className="hero-sub">{hero.subheadline}</p>
 
             <div className="hero-ctas">
-              <a href="#contact" className="btn btn-gold">
+              <button className="btn btn-gold" onClick={() => navigateTo('contact')}>
                 Admissions Open <ArrowRight size={18} />
-              </a>
-              <a href="#courses" className="btn btn-outline" style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'white' }}>
+              </button>
+              <button className="btn btn-outline" style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'white' }} onClick={() => navigateTo('courses')}>
                 <Play size={18} /> View Programs
-              </a>
+              </button>
             </div>
 
             <div className="hero-trust" style={{ marginTop: 48, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -78,14 +104,14 @@ export default function Hero() {
           <div className="hero-right reveal d-2">
             <div className="hero-images">
               <div className="image-main">
-                <img src="/teacher_physics.png" alt="Faculty" />
+                <img src={hero.heroImage || '/teacher_physics.png'} alt="Faculty" />
               </div>
               <div className="image-float top-right reveal d-3">
                 <div className="float-card">
                   <div className="fc-icon"><Medal size={20} color="var(--gold)" /></div>
                   <div>
-                    <div className="fc-title">AIR 142</div>
-                    <div className="fc-sub">JEE Advanced '25</div>
+                    <div className="fc-title">{hero.airRank || 'AIR 142'}</div>
+                    <div className="fc-sub">{hero.airLabel || "JEE Advanced '25"}</div>
                   </div>
                 </div>
               </div>
@@ -93,8 +119,8 @@ export default function Hero() {
                 <div className="float-card">
                   <div className="fc-icon"><Star size={20} fill="var(--gold)" color="var(--gold)" /></div>
                   <div>
-                    <div className="fc-title">98.4%</div>
-                    <div className="fc-sub">Board Topper</div>
+                    <div className="fc-title">{hero.percentage || '98.4%'}</div>
+                    <div className="fc-sub">{hero.percentageLabel || 'Board Topper'}</div>
                   </div>
                 </div>
               </div>
@@ -106,8 +132,55 @@ export default function Hero() {
       {/* Edit modal */}
       {editing && (
         <div className="modal-overlay" onClick={() => setEditing(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
             <h3><Edit2 size={24} color="var(--primary)" /> Edit Hero Section</h3>
+
+            {/* Image Upload */}
+            <div className="form-group">
+              <label>Hero Image</label>
+              <div className="hero-img-preview">
+                <img src={draft.heroImage || '/teacher_physics.png'} alt="Preview" />
+                <div className="hero-img-overlay" onClick={() => fileInputRef.current.click()}>
+                  <Upload size={20} />
+                  <span>Change Image</span>
+                </div>
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageChange}
+              />
+              <button
+                className="btn-cancel"
+                style={{ marginTop: 8, fontSize: 13 }}
+                onClick={() => fileInputRef.current.click()}
+              >
+                <Upload size={14} /> Upload New Image
+              </button>
+            </div>
+
+            {/* AIR Rank */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label>AIR Rank (e.g. AIR 142)</label>
+                <input value={draft.airRank || ''} onChange={e => setDraft({ ...draft, airRank: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Rank Label (e.g. JEE Advanced '25)</label>
+                <input value={draft.airLabel || ''} onChange={e => setDraft({ ...draft, airLabel: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Percentage (e.g. 98.4%)</label>
+                <input value={draft.percentage || ''} onChange={e => setDraft({ ...draft, percentage: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Percentage Label</label>
+                <input value={draft.percentageLabel || ''} onChange={e => setDraft({ ...draft, percentageLabel: e.target.value })} />
+              </div>
+            </div>
+
             <div className="form-group">
               <label>Main Headline</label>
               <input value={draft.headline} onChange={e => setDraft({ ...draft, headline: e.target.value })} />
@@ -168,9 +241,7 @@ export default function Hero() {
           position: relative;
           z-index: 10;
         }
-        .hero-left {
-          color: var(--white);
-        }
+        .hero-left { color: var(--white); }
         .hero-headline {
           font-size: clamp(40px, 6vw, 64px);
           font-weight: 700;
@@ -191,7 +262,7 @@ export default function Hero() {
         .trust-item strong { display: block; font-family: 'Playfair Display', serif; font-size: 24px; color: var(--gold); line-height: 1.2; }
         .trust-item span { font-size: 13px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
         .trust-divider { width: 1px; height: 40px; background: rgba(255,255,255,0.1); }
-        
+
         .hero-right {
           position: relative;
           height: 100%;
@@ -213,9 +284,7 @@ export default function Hero() {
           max-height: 560px;
           background: var(--primary-dark);
         }
-        .image-main img {
-          width: 100%; height: 100%; object-fit: cover; opacity: 0.9;
-        }
+        .image-main img { width: 100%; height: 100%; object-fit: cover; opacity: 0.9; }
         .image-float { position: absolute; }
         .image-float.top-right { top: -20px; right: -30px; }
         .image-float.bottom-left { bottom: -30px; left: -40px; }
@@ -238,6 +307,32 @@ export default function Hero() {
         }
         .fc-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--gold); }
         .fc-sub { font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-top: 2px; }
+
+        /* Image upload preview */
+        .hero-img-preview {
+          position: relative;
+          width: 140px;
+          height: 160px;
+          border-radius: 12px;
+          overflow: hidden;
+          cursor: pointer;
+          border: 2px solid var(--primary);
+          margin-bottom: 8px;
+        }
+        .hero-img-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .hero-img-overlay {
+          position: absolute; inset: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 6px;
+          color: white;
+          font-size: 13px;
+          font-weight: 600;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+        .hero-img-preview:hover .hero-img-overlay { opacity: 1; }
 
         @media (max-width: 1024px) {
           .hero-content { grid-template-columns: 1fr; text-align: center; gap: 40px; }

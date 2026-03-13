@@ -38,6 +38,11 @@ export const DEFAULT_HERO = {
   headline: "India's Future IITians Start Here",
   subheadline: "Premium Coaching for Class 11, 12 & IIT/JEE — Small Batches. Giant Results.",
   announcement: "🎉 JEE Advanced 2025: 12 Students Selected! Admissions Open for 2026-27 Batch.",
+  heroImage: "/teacher_physics.png",
+  airRank: "AIR 142",
+  airLabel: "JEE Advanced '25",
+  percentage: "98.4%",
+  percentageLabel: "Board Topper",
 };
 
 // ─── Storage helpers ────────────────────────────────────────────────────────
