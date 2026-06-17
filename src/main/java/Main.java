@@ -30,28 +30,39 @@ public class Main {
                 if (builtins.contains(arg)) {
                     System.out.println(arg + " is a shell builtin");
                 } else {
-                    // Search PATH for the executable
-                    String path = System.getenv("PATH");
-                    String[] dirs = path.split(File.pathSeparator);
-                    boolean found = false;
-
-                    for (String dir : dirs) {
-                        File file = new File(dir, arg);
-                        if (file.exists() && file.canExecute()) {
-                            System.out.println(arg + " is " + file.getAbsolutePath());
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (!found) {
+                    String fullPath = findExecutable(arg);
+                    if (fullPath != null) {
+                        System.out.println(arg + " is " + fullPath);
+                    } else {
                         System.out.println(arg + ": not found");
                     }
                 }
 
             } else {
-                System.out.println(input + ": command not found");
+                String fullPath = findExecutable(command);
+                if (fullPath != null) {
+                    String[] allArgs = input.split(" ");
+                    ProcessBuilder pb = new ProcessBuilder(allArgs);
+                    pb.inheritIO();
+                    Process process = pb.start();
+                    process.waitFor();
+                } else {
+                    System.out.println(input + ": command not found");
+                }
             }
         }
+    }
+
+    private static String findExecutable(String command) {
+        String path = System.getenv("PATH");
+        String[] dirs = path.split(File.pathSeparator);
+
+        for (String dir : dirs) {
+            File file = new File(dir, command);
+            if (file.exists() && file.canExecute()) {
+                return file.getAbsolutePath();
+            }
+        }
+        return null;
     }
 }
