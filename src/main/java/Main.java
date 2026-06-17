@@ -1,5 +1,6 @@
 import java.util.Scanner;
 import java.util.Set;
+import java.io.File;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -10,7 +11,6 @@ public class Main {
             System.out.print("$ ");
             String input = scanner.nextLine();
 
-            // Split into command and arguments
             String[] parts = input.split(" ", 2);
             String command = parts[0];
 
@@ -26,10 +26,27 @@ public class Main {
 
             } else if (command.equals("type")) {
                 String arg = parts.length > 1 ? parts[1] : "";
+
                 if (builtins.contains(arg)) {
                     System.out.println(arg + " is a shell builtin");
                 } else {
-                    System.out.println(arg + ": not found");
+                    // Search PATH for the executable
+                    String path = System.getenv("PATH");
+                    String[] dirs = path.split(File.pathSeparator);
+                    boolean found = false;
+
+                    for (String dir : dirs) {
+                        File file = new File(dir, arg);
+                        if (file.exists() && file.canExecute()) {
+                            System.out.println(arg + " is " + file.getAbsolutePath());
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        System.out.println(arg + ": not found");
+                    }
                 }
 
             } else {
