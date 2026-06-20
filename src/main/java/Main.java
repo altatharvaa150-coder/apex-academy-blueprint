@@ -50,7 +50,14 @@ public class Main {
                         buf.append(rest);
                         lastTabRang = false;
                     } else {
-                        if (lastTabRang && prefix.equals(lastTabPrefix)) {
+                        String lcp = longestCommonPrefix(matches);
+                        if (lcp.length() > prefix.length()) {
+                            String rest = lcp.substring(prefix.length());
+                            System.out.print(rest);
+                            System.out.flush();
+                            buf.append(rest);
+                            lastTabRang = false;
+                        } else if (lastTabRang && prefix.equals(lastTabPrefix)) {
                             System.out.print("\n");
                             StringBuilder line = new StringBuilder();
                             for (int i = 0; i < matches.size(); i++) {
@@ -258,6 +265,21 @@ public class Main {
             }
         }
         return new ArrayList<>(matches);
+    }
+
+    private static String longestCommonPrefix(List<String> list) {
+        if (list.isEmpty()) return "";
+        String result = list.get(0);
+        for (int i = 1; i < list.size(); i++) {
+            String s = list.get(i);
+            int j = 0;
+            while (j < result.length() && j < s.length() && result.charAt(j) == s.charAt(j)) {
+                j++;
+            }
+            result = result.substring(0, j);
+            if (result.isEmpty()) break;
+        }
+        return result;
     }
 
     private static void enableRawMode() {
