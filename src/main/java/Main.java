@@ -1,65 +1,67 @@
 import java.util.Scanner;
-import java.util.Set;
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
-        Set<String> builtins = Set.of("echo", "exit", "type");
+        List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd");
 
         while (true) {
             System.out.print("$ ");
-            String input = scanner.nextLine();
+            if (!scanner.hasNextLine()) break;
+            String input = scanner.nextLine().trim();
+            if (input.isEmpty()) continue;
 
-            String[] parts = input.split(" ", 2);
+            String[] parts = input.split("\\s+");
             String command = parts[0];
 
             if (command.equals("exit")) {
-                break;
-
+                int code = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+                System.exit(code);
             } else if (command.equals("echo")) {
-                if (parts.length > 1) {
-                    System.out.println(parts[1]);
-                } else {
-                    System.out.println();
+                StringBuilder sb = new StringBuilder();
+                for (int i = 1; i < parts.length; i++) {
+                    if (i > 1) sb.append(" ");
+                    sb.append(parts[i]);
                 }
-
+                System.out.println(sb.toString());
+            } else if (command.equals("pwd")) {
+                System.out.println(System.getProperty("user.dir"));
             } else if (command.equals("type")) {
-                String arg = parts.length > 1 ? parts[1] : "";
-
-                if (builtins.contains(arg)) {
-                    System.out.println(arg + " is a shell builtin");
+                if (parts.length < 2) continue;
+                String target = parts[1];
+                if (builtins.contains(target)) {
+                    System.out.println(target + " is a shell builtin");
                 } else {
-                    String fullPath = findExecutable(arg);
-                    if (fullPath != null) {
-                        System.out.println(arg + " is " + fullPath);
+                    String path = findExecutable(target);
+                    if (path != null) {
+                        System.out.println(target + " is " + path);
                     } else {
-                        System.out.println(arg + ": not found");
+                        System.out.println(target + ": not found");
                     }
                 }
-
             } else {
-                String fullPath = findExecutable(command);
-                if (fullPath != null) {
-                    String[] allArgs = input.split(" ");
-                    ProcessBuilder pb = new ProcessBuilder(allArgs);
+                String path = findExecutable(command);
+                if (path != null) {
+                    ProcessBuilder pb = new ProcessBuilder(parts);
                     pb.inheritIO();
-                    Process process = pb.start();
-                    process.waitFor();
+                    Process p = pb.start();
+                    p.waitFor();
                 } else {
-                    System.out.println(input + ": command not found");
+                    System.out.println(command + ": command not found");
                 }
             }
         }
     }
 
-    private static String findExecutable(String command) {
-        String path = System.getenv("PATH");
-        String[] dirs = path.split(File.pathSeparator);
-
-        for (String dir : dirs) {
-            File file = new File(dir, command);
-            if (file.exists() && file.canExecute()) {
+    private static String findExecutable(String name) {
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv == null) return null;
+        for (String dir : pathEnv.split(File.pathSeparator)) {
+            File file = new File(dir, name);
+            if (file.isFile() && file.canExecute()) {
                 return file.getAbsolutePath();
             }
         }
