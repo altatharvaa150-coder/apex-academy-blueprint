@@ -22,11 +22,15 @@ public class Main {
             if (rawTokens.isEmpty()) continue;
 
             String stdoutFile = null;
+            String stderrFile = null;
             List<String> tokens = new ArrayList<>();
             for (int i = 0; i < rawTokens.size(); i++) {
                 String t = rawTokens.get(i);
                 if ((t.equals(">") || t.equals("1>")) && i + 1 < rawTokens.size()) {
                     stdoutFile = rawTokens.get(i + 1);
+                    i++;
+                } else if (t.equals("2>") && i + 1 < rawTokens.size()) {
+                    stderrFile = rawTokens.get(i + 1);
                     i++;
                 } else {
                     tokens.add(t);
@@ -65,13 +69,22 @@ public class Main {
                 }
             } else if (command.equals("echo") || command.equals("pwd") || command.equals("type")) {
                 PrintStream out = System.out;
-                FileOutputStream fos = null;
+                PrintStream err = System.err;
+                FileOutputStream fosOut = null;
+                FileOutputStream fosErr = null;
                 if (stdoutFile != null) {
                     File f = new File(stdoutFile);
                     File parent = f.getParentFile();
                     if (parent != null && !parent.exists()) parent.mkdirs();
-                    fos = new FileOutputStream(f);
-                    out = new PrintStream(fos);
+                    fosOut = new FileOutputStream(f);
+                    out = new PrintStream(fosOut);
+                }
+                if (stderrFile != null) {
+                    File f = new File(stderrFile);
+                    File parent = f.getParentFile();
+                    if (parent != null && !parent.exists()) parent.mkdirs();
+                    fosErr = new FileOutputStream(f);
+                    err = new PrintStream(fosErr);
                 }
 
                 if (command.equals("echo")) {
@@ -99,15 +112,13 @@ public class Main {
                     }
                 }
 
-                if (fos != null) {
-                    out.close();
-                }
+                if (fosOut != null) out.close();
+                if (fosErr != null) err.close();
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
                     ProcessBuilder pb = new ProcessBuilder(tokens);
                     pb.directory(new File(cwd));
-                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
                     pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
                     if (stdoutFile != null) {
                         File f = new File(stdoutFile);
@@ -116,6 +127,14 @@ public class Main {
                         pb.redirectOutput(f);
                     } else {
                         pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                    }
+                    if (stderrFile != null) {
+                        File f = new File(stderrFile);
+                        File parent = f.getParentFile();
+                        if (parent != null && !parent.exists()) parent.mkdirs();
+                        pb.redirectError(f);
+                    } else {
+                        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
                     }
                     Process p = pb.start();
                     p.waitFor();
@@ -169,13 +188,14 @@ public class Main {
                     inDouble = true;
                     hasToken = true;
                 } else if (c == '>') {
-                    if (hasToken && current.toString().equals("1")) {
+                    String cur = current.toString();
+                    if (hasToken && (cur.equals("1") || cur.equals("2"))) {
                         current.setLength(0);
                         hasToken = false;
-                        tokens.add("1>");
+                        tokens.add(cur + ">");
                     } else {
                         if (hasToken) {
-                            tokens.add(current.toString());
+                            tokens.add(cur);
                             current.setLength(0);
                             hasToken = false;
                         }
