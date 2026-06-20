@@ -1,6 +1,6 @@
-import java.util.Scanner;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
@@ -8,14 +8,57 @@ import java.util.ArrayList;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        Scanner scanner = new Scanner(System.in);
+        enableRawMode();
+
+        InputStream in = System.in;
         List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd");
+        List<String> completables = Arrays.asList("echo", "exit");
         String cwd = System.getProperty("user.dir");
 
         while (true) {
             System.out.print("$ ");
-            if (!scanner.hasNextLine()) break;
-            String input = scanner.nextLine();
+            System.out.flush();
+
+            StringBuilder buf = new StringBuilder();
+            while (true) {
+                int ch = in.read();
+                if (ch == -1) {
+                    restoreMode();
+                    return;
+                }
+                if (ch == '\n' || ch == '\r') {
+                    System.out.print("\n");
+                    System.out.flush();
+                    break;
+                } else if (ch == '\t') {
+                    String prefix = buf.toString();
+                    String match = null;
+                    for (String b : completables) {
+                        if (b.startsWith(prefix) && !b.equals(prefix)) {
+                            match = b;
+                            break;
+                        }
+                    }
+                    if (match != null) {
+                        String rest = match.substring(prefix.length()) + " ";
+                        System.out.print(rest);
+                        System.out.flush();
+                        buf.append(rest);
+                    }
+                } else if (ch == 127 || ch == 8) {
+                    if (buf.length() > 0) {
+                        buf.deleteCharAt(buf.length() - 1);
+                        System.out.print("\b \b");
+                        System.out.flush();
+                    }
+                } else if (ch >= 32) {
+                    buf.append((char) ch);
+                    System.out.print((char) ch);
+                    System.out.flush();
+                }
+            }
+
+            String input = buf.toString();
             if (input.trim().isEmpty()) continue;
 
             List<String> rawTokens = parseInput(input);
@@ -54,6 +97,7 @@ public class Main {
 
             if (command.equals("exit")) {
                 int code = tokens.size() > 1 ? Integer.parseInt(tokens.get(1)) : 0;
+                restoreMode();
                 System.exit(code);
             } else if (command.equals("cd")) {
                 String target = tokens.size() < 2 ? "~" : tokens.get(1);
@@ -162,6 +206,22 @@ public class Main {
                     System.out.println(command + ": command not found");
                 }
             }
+        }
+    }
+
+    private static void enableRawMode() {
+        try {
+            String[] cmd = {"/bin/sh", "-c", "stty -icanon -echo min 1 < /dev/tty"};
+            Runtime.getRuntime().exec(cmd).waitFor();
+        } catch (Exception e) {
+        }
+    }
+
+    private static void restoreMode() {
+        try {
+            String[] cmd = {"/bin/sh", "-c", "stty icanon echo < /dev/tty"};
+            Runtime.getRuntime().exec(cmd).waitFor();
+        } catch (Exception e) {
         }
     }
 
