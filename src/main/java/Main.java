@@ -22,6 +22,9 @@ public class Main {
             System.out.flush();
 
             StringBuilder buf = new StringBuilder();
+            boolean lastTabRang = false;
+            String lastTabPrefix = "";
+
             while (true) {
                 int ch = in.read();
                 if (ch == -1) {
@@ -34,15 +37,36 @@ public class Main {
                     break;
                 } else if (ch == '\t') {
                     String prefix = buf.toString();
-                    String match = findCompletion(prefix, completables);
-                    if (match != null) {
+                    List<String> matches = findMatches(prefix, completables);
+                    if (matches.isEmpty()) {
+                        System.out.print((char) 7);
+                        System.out.flush();
+                        lastTabRang = false;
+                    } else if (matches.size() == 1) {
+                        String match = matches.get(0);
                         String rest = match.substring(prefix.length()) + " ";
                         System.out.print(rest);
                         System.out.flush();
                         buf.append(rest);
+                        lastTabRang = false;
                     } else {
-                        System.out.print((char) 7);
-                        System.out.flush();
+                        if (lastTabRang && prefix.equals(lastTabPrefix)) {
+                            System.out.print("\n");
+                            StringBuilder line = new StringBuilder();
+                            for (int i = 0; i < matches.size(); i++) {
+                                if (i > 0) line.append("  ");
+                                line.append(matches.get(i));
+                            }
+                            System.out.println(line.toString());
+                            System.out.print("$ " + prefix);
+                            System.out.flush();
+                            lastTabRang = false;
+                        } else {
+                            System.out.print((char) 7);
+                            System.out.flush();
+                            lastTabRang = true;
+                            lastTabPrefix = prefix;
+                        }
                     }
                 } else if (ch == 127 || ch == 8) {
                     if (buf.length() > 0) {
@@ -50,10 +74,12 @@ public class Main {
                         System.out.print("\b \b");
                         System.out.flush();
                     }
+                    lastTabRang = false;
                 } else if (ch >= 32) {
                     buf.append((char) ch);
                     System.out.print((char) ch);
                     System.out.flush();
+                    lastTabRang = false;
                 }
             }
 
@@ -208,8 +234,8 @@ public class Main {
         }
     }
 
-    private static String findCompletion(String prefix, List<String> completables) {
-        if (prefix.isEmpty()) return null;
+    private static List<String> findMatches(String prefix, List<String> completables) {
+        if (prefix.isEmpty()) return new ArrayList<>();
         Set<String> matches = new TreeSet<>();
         for (String b : completables) {
             if (b.startsWith(prefix)) matches.add(b);
@@ -231,8 +257,7 @@ public class Main {
                 }
             }
         }
-        if (matches.isEmpty()) return null;
-        return matches.iterator().next();
+        return new ArrayList<>(matches);
     }
 
     private static void enableRawMode() {
