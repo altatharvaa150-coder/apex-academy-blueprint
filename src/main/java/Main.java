@@ -23,14 +23,26 @@ public class Main {
 
             String stdoutFile = null;
             String stderrFile = null;
+            boolean appendStdout = false;
+            boolean appendStderr = false;
             List<String> tokens = new ArrayList<>();
             for (int i = 0; i < rawTokens.size(); i++) {
                 String t = rawTokens.get(i);
                 if ((t.equals(">") || t.equals("1>")) && i + 1 < rawTokens.size()) {
                     stdoutFile = rawTokens.get(i + 1);
+                    appendStdout = false;
+                    i++;
+                } else if ((t.equals(">>") || t.equals("1>>")) && i + 1 < rawTokens.size()) {
+                    stdoutFile = rawTokens.get(i + 1);
+                    appendStdout = true;
                     i++;
                 } else if (t.equals("2>") && i + 1 < rawTokens.size()) {
                     stderrFile = rawTokens.get(i + 1);
+                    appendStderr = false;
+                    i++;
+                } else if (t.equals("2>>") && i + 1 < rawTokens.size()) {
+                    stderrFile = rawTokens.get(i + 1);
+                    appendStderr = true;
                     i++;
                 } else {
                     tokens.add(t);
@@ -76,14 +88,14 @@ public class Main {
                     File f = new File(stdoutFile);
                     File parent = f.getParentFile();
                     if (parent != null && !parent.exists()) parent.mkdirs();
-                    fosOut = new FileOutputStream(f);
+                    fosOut = new FileOutputStream(f, appendStdout);
                     out = new PrintStream(fosOut);
                 }
                 if (stderrFile != null) {
                     File f = new File(stderrFile);
                     File parent = f.getParentFile();
                     if (parent != null && !parent.exists()) parent.mkdirs();
-                    fosErr = new FileOutputStream(f);
+                    fosErr = new FileOutputStream(f, appendStderr);
                     err = new PrintStream(fosErr);
                 }
 
@@ -124,7 +136,11 @@ public class Main {
                         File f = new File(stdoutFile);
                         File parent = f.getParentFile();
                         if (parent != null && !parent.exists()) parent.mkdirs();
-                        pb.redirectOutput(f);
+                        if (appendStdout) {
+                            pb.redirectOutput(ProcessBuilder.Redirect.appendTo(f));
+                        } else {
+                            pb.redirectOutput(f);
+                        }
                     } else {
                         pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
                     }
@@ -132,7 +148,11 @@ public class Main {
                         File f = new File(stderrFile);
                         File parent = f.getParentFile();
                         if (parent != null && !parent.exists()) parent.mkdirs();
-                        pb.redirectError(f);
+                        if (appendStderr) {
+                            pb.redirectError(ProcessBuilder.Redirect.appendTo(f));
+                        } else {
+                            pb.redirectError(f);
+                        }
                     } else {
                         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
                     }
@@ -189,17 +209,21 @@ public class Main {
                     hasToken = true;
                 } else if (c == '>') {
                     String cur = current.toString();
+                    String prefix = "";
                     if (hasToken && (cur.equals("1") || cur.equals("2"))) {
+                        prefix = cur;
                         current.setLength(0);
                         hasToken = false;
-                        tokens.add(cur + ">");
+                    } else if (hasToken) {
+                        tokens.add(cur);
+                        current.setLength(0);
+                        hasToken = false;
+                    }
+                    if (i + 1 < input.length() && input.charAt(i + 1) == '>') {
+                        tokens.add(prefix + ">>");
+                        i++;
                     } else {
-                        if (hasToken) {
-                            tokens.add(cur);
-                            current.setLength(0);
-                            hasToken = false;
-                        }
-                        tokens.add(">");
+                        tokens.add(prefix + ">");
                     }
                 } else if (Character.isWhitespace(c)) {
                     if (hasToken) {
