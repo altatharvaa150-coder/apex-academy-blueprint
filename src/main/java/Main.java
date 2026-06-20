@@ -107,7 +107,13 @@ public class Main {
                     current.append(c);
                 }
             } else {
-                if (c == '\'') {
+                if (c == '\\') {
+                    if (i + 1 < input.length()) {
+                        current.append(input.charAt(i + 1));
+                        i++;
+                        hasToken = true;
+                    }
+                } else if (c == '\'') {
                     inSingle = true;
                     hasToken = true;
                 } else if (c == '"') {
