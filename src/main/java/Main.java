@@ -101,7 +101,15 @@ public class Main {
                     current.append(c);
                 }
             } else if (inDouble) {
-                if (c == '"') {
+                if (c == '\\' && i + 1 < input.length()) {
+                    char next = input.charAt(i + 1);
+                    if (next == '"' || next == '\\' || next == '$' || next == '`') {
+                        current.append(next);
+                        i++;
+                    } else {
+                        current.append(c);
+                    }
+                } else if (c == '"') {
                     inDouble = false;
                 } else {
                     current.append(c);
