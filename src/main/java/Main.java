@@ -33,10 +33,20 @@ public class Main {
             } else if (command.equals("cd")) {
                 if (parts.length < 2) continue;
                 String target = parts[1];
-                File dir = new File(target);
-                if (dir.isDirectory()) {
-                    cwd = dir.getAbsolutePath();
+                File dir;
+                if (target.startsWith("/")) {
+                    dir = new File(target);
                 } else {
+                    dir = new File(cwd, target);
+                }
+                try {
+                    File resolved = dir.getCanonicalFile();
+                    if (resolved.isDirectory()) {
+                        cwd = resolved.getAbsolutePath();
+                    } else {
+                        System.out.println("cd: " + target + ": No such file or directory");
+                    }
+                } catch (Exception e) {
                     System.out.println("cd: " + target + ": No such file or directory");
                 }
             } else if (command.equals("type")) {
