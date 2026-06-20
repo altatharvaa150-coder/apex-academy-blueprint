@@ -6,7 +6,8 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
-        List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd");
+        List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd");
+        String cwd = System.getProperty("user.dir");
 
         while (true) {
             System.out.print("$ ");
@@ -28,7 +29,16 @@ public class Main {
                 }
                 System.out.println(sb.toString());
             } else if (command.equals("pwd")) {
-                System.out.println(System.getProperty("user.dir"));
+                System.out.println(cwd);
+            } else if (command.equals("cd")) {
+                if (parts.length < 2) continue;
+                String target = parts[1];
+                File dir = new File(target);
+                if (dir.isDirectory()) {
+                    cwd = dir.getAbsolutePath();
+                } else {
+                    System.out.println("cd: " + target + ": No such file or directory");
+                }
             } else if (command.equals("type")) {
                 if (parts.length < 2) continue;
                 String target = parts[1];
@@ -46,6 +56,7 @@ public class Main {
                 String path = findExecutable(command);
                 if (path != null) {
                     ProcessBuilder pb = new ProcessBuilder(parts);
+                    pb.directory(new File(cwd));
                     pb.inheritIO();
                     Process p = pb.start();
                     p.waitFor();
