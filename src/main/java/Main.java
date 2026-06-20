@@ -89,6 +89,7 @@ public class Main {
         List<String> tokens = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inSingle = false;
+        boolean inDouble = false;
         boolean hasToken = false;
 
         for (int i = 0; i < input.length(); i++) {
@@ -99,9 +100,18 @@ public class Main {
                 } else {
                     current.append(c);
                 }
+            } else if (inDouble) {
+                if (c == '"') {
+                    inDouble = false;
+                } else {
+                    current.append(c);
+                }
             } else {
                 if (c == '\'') {
                     inSingle = true;
+                    hasToken = true;
+                } else if (c == '"') {
+                    inDouble = true;
                     hasToken = true;
                 } else if (Character.isWhitespace(c)) {
                     if (hasToken) {
