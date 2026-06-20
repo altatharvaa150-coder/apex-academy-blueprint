@@ -31,8 +31,18 @@ public class Main {
             } else if (command.equals("pwd")) {
                 System.out.println(cwd);
             } else if (command.equals("cd")) {
-                if (parts.length < 2) continue;
-                String target = parts[1];
+                String target;
+                if (parts.length < 2) {
+                    target = "~";
+                } else {
+                    target = parts[1];
+                }
+                if (target.equals("~")) {
+                    String home = System.getenv("HOME");
+                    if (home == null) home = System.getenv("USERPROFILE");
+                    if (home != null) cwd = home;
+                    continue;
+                }
                 File dir;
                 if (target.startsWith("/")) {
                     dir = new File(target);
