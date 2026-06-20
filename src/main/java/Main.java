@@ -5,6 +5,8 @@ import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -32,13 +34,7 @@ public class Main {
                     break;
                 } else if (ch == '\t') {
                     String prefix = buf.toString();
-                    String match = null;
-                    for (String b : completables) {
-                        if (b.startsWith(prefix) && !b.equals(prefix)) {
-                            match = b;
-                            break;
-                        }
-                    }
+                    String match = findCompletion(prefix, completables);
                     if (match != null) {
                         String rest = match.substring(prefix.length()) + " ";
                         System.out.print(rest);
@@ -210,6 +206,33 @@ public class Main {
                 }
             }
         }
+    }
+
+    private static String findCompletion(String prefix, List<String> completables) {
+        if (prefix.isEmpty()) return null;
+        Set<String> matches = new TreeSet<>();
+        for (String b : completables) {
+            if (b.startsWith(prefix)) matches.add(b);
+        }
+        String pathEnv = System.getenv("PATH");
+        if (pathEnv != null) {
+            for (String dir : pathEnv.split(File.pathSeparator)) {
+                File d = new File(dir);
+                if (!d.isDirectory()) continue;
+                String[] files = d.list();
+                if (files == null) continue;
+                for (String name : files) {
+                    if (name.startsWith(prefix)) {
+                        File f = new File(d, name);
+                        if (f.isFile() && f.canExecute()) {
+                            matches.add(name);
+                        }
+                    }
+                }
+            }
+        }
+        if (matches.isEmpty()) return null;
+        return matches.iterator().next();
     }
 
     private static void enableRawMode() {
