@@ -44,6 +44,9 @@ public class Main {
                         System.out.print(rest);
                         System.out.flush();
                         buf.append(rest);
+                    } else {
+                        System.out.print((char) 7);
+                        System.out.flush();
                     }
                 } else if (ch == 127 || ch == 8) {
                     if (buf.length() > 0) {
