@@ -20,7 +20,7 @@ public class Main {
     static Map<String, String> completionSpecs = new HashMap<>();
     static Map<Integer, Process> backgroundJobs = new LinkedHashMap<>();
     static Map<Integer, String> backgroundCommands = new LinkedHashMap<>();
-    static List<String> BUILTINS = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete", "jobs");
+    static List<String> BUILTINS = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete", "jobs", "history");
 
     public static void main(String[] args) throws Exception {
         enableRawMode();
@@ -313,6 +313,8 @@ public class Main {
                     backgroundJobs.remove(jobNum);
                     backgroundCommands.remove(jobNum);
                 }
+            } else if (command.equals("history")) {
+                // full listing implemented in later stages
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
