@@ -49,9 +49,24 @@ public class Main {
 
                     List<String> matches;
                     if (isArg) {
-                        String cmdName = full.substring(0, full.indexOf(' ')).trim();
+                        String[] words = full.split("\\s+");
+                        String cmdName = words[0];
                         if (completionSpecs.containsKey(cmdName)) {
-                            matches = runCompleter(completionSpecs.get(cmdName), prefix);
+                            String currentWord = prefix;
+                            String prevWord = "";
+                            if (words.length >= 2 && !full.endsWith(" ") && full.contains(" ")) {
+                                if (words.length >= 2) {
+                                    prevWord = words[words.length - 1].equals(currentWord) && words.length >= 3 ? words[words.length - 2] : "";
+                                    if (words.length == 2 && !currentWord.isEmpty()) {
+                                        prevWord = cmdName;
+                                    } else if (words.length > 2 && !currentWord.isEmpty()) {
+                                        prevWord = words[words.length - 2];
+                                    }
+                                }
+                            } else if (full.endsWith(" ")) {
+                                prevWord = words[words.length - 1];
+                            }
+                            matches = runCompleter(completionSpecs.get(cmdName), cmdName, currentWord, prevWord);
                         } else {
                             matches = findFileMatches(prefix, cwd);
                         }
@@ -66,12 +81,9 @@ public class Main {
                     } else if (matches.size() == 1) {
                         String match = matches.get(0);
                         String suffix;
-                        if (!isArg || !completionSpecs.containsKey(full.substring(0, full.indexOf(' ')).trim())) {
-                            if (isArg && isDirectory(match, cwd)) {
-                                suffix = match.substring(prefix.length()) + "/";
-                            } else {
-                                suffix = match.substring(prefix.length()) + " ";
-                            }
+                        String cmdName = isArg ? full.substring(0, full.indexOf(' ')).trim() : "";
+                        if (isArg && !completionSpecs.containsKey(cmdName) && isDirectory(match, cwd)) {
+                            suffix = match.substring(prefix.length()) + "/";
                         } else {
                             suffix = match.substring(prefix.length()) + " ";
                         }
@@ -89,11 +101,13 @@ public class Main {
                             lastTabRang = false;
                         } else if (lastTabRang && full.equals(lastTabPrefix)) {
                             System.out.print("\n");
+                            String cmdName = isArg ? full.substring(0, full.indexOf(' ')).trim() : "";
+                            boolean useCompleter = isArg && completionSpecs.containsKey(cmdName);
                             List<String> display = new ArrayList<>();
                             for (String m : matches) {
                                 int sl = m.lastIndexOf('/');
                                 String name = sl >= 0 ? m.substring(sl + 1) : m;
-                                if (isArg && !completionSpecs.containsKey(full.substring(0, full.indexOf(' ')).trim()) && isDirectory(m, cwd)) {
+                                if (isArg && !useCompleter && isDirectory(m, cwd)) {
                                     name = name + "/";
                                 }
                                 display.add(name);
@@ -293,17 +307,17 @@ public class Main {
         }
     }
 
-    private static List<String> runCompleter(String script, String prefix) {
+    private static List<String> runCompleter(String script, String cmdName, String currentWord, String prevWord) {
         List<String> results = new ArrayList<>();
         try {
-            ProcessBuilder pb = new ProcessBuilder(script);
+            ProcessBuilder pb = new ProcessBuilder(script, cmdName, currentWord, prevWord);
             pb.redirectError(ProcessBuilder.Redirect.INHERIT);
             Process p = pb.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
-                if (!line.isEmpty() && line.startsWith(prefix)) {
+                if (!line.isEmpty()) {
                     results.add(line);
                 }
             }
