@@ -69,10 +69,15 @@ public class Main {
                             lastTabRang = false;
                         } else if (lastTabRang && full.equals(lastTabPrefix)) {
                             System.out.print("\n");
+                            List<String> names = new ArrayList<>();
+                            for (String m : matches) {
+                                int sl = m.lastIndexOf('/');
+                                names.add(sl >= 0 ? m.substring(sl + 1) : m);
+                            }
                             StringBuilder line = new StringBuilder();
-                            for (int i = 0; i < matches.size(); i++) {
+                            for (int i = 0; i < names.size(); i++) {
                                 if (i > 0) line.append("  ");
-                                line.append(matches.get(i));
+                                line.append(names.get(i));
                             }
                             System.out.println(line.toString());
                             System.out.print("$ " + full);
@@ -277,15 +282,31 @@ public class Main {
         return new ArrayList<>(matches);
     }
 
-    private static List<String> findFileMatches(String prefix, String cwd) {
+    private static List<String> findFileMatches(String token, String cwd) {
+        String dirPath = "";
+        String filePrefix = token;
+        int lastSlash = token.lastIndexOf('/');
+        if (lastSlash >= 0) {
+            dirPath = token.substring(0, lastSlash + 1);
+            filePrefix = token.substring(lastSlash + 1);
+        }
+
+        File searchDir;
+        if (dirPath.startsWith("/")) {
+            searchDir = new File(dirPath);
+        } else if (!dirPath.isEmpty()) {
+            searchDir = new File(cwd, dirPath);
+        } else {
+            searchDir = new File(cwd);
+        }
+
         Set<String> matches = new TreeSet<>();
-        File dir = new File(cwd);
-        if (!dir.isDirectory()) return new ArrayList<>();
-        String[] files = dir.list();
-        if (files == null) return new ArrayList<>();
-        for (String name : files) {
-            if (name.startsWith(prefix)) {
-                matches.add(name);
+        if (!searchDir.isDirectory()) return new ArrayList<>();
+        String[] entries = searchDir.list();
+        if (entries == null) return new ArrayList<>();
+        for (String name : entries) {
+            if (name.startsWith(filePrefix)) {
+                matches.add(dirPath + name);
             }
         }
         return new ArrayList<>(matches);
