@@ -155,6 +155,11 @@ public class Main {
             }
             if (rawTokens.isEmpty()) continue;
 
+            if (rawTokens.contains("|")) {
+                runPipeline(rawTokens, cwd);
+                continue;
+            }
+
             String stdoutFile = null;
             String stderrFile = null;
             boolean appendStdout = false;
@@ -348,6 +353,105 @@ public class Main {
                     System.out.println(command + ": command not found");
                 }
             }
+        }
+    }
+
+    private static void runPipeline(List<String> rawTokens, String cwd) throws Exception {
+        List<List<String>> segments = new ArrayList<>();
+        List<String> currentSegment = new ArrayList<>();
+        for (String t : rawTokens) {
+            if (t.equals("|")) {
+                segments.add(currentSegment);
+                currentSegment = new ArrayList<>();
+            } else {
+                currentSegment.add(t);
+            }
+        }
+        segments.add(currentSegment);
+
+        List<ProcessBuilder> builders = new ArrayList<>();
+        for (int idx = 0; idx < segments.size(); idx++) {
+            List<String> segTokens = segments.get(idx);
+
+            String segStdout = null;
+            String segStderr = null;
+            boolean segAppendOut = false;
+            boolean segAppendErr = false;
+            List<String> cmdTokens = new ArrayList<>();
+            for (int i = 0; i < segTokens.size(); i++) {
+                String t = segTokens.get(i);
+                if ((t.equals(">") || t.equals("1>")) && i + 1 < segTokens.size()) {
+                    segStdout = segTokens.get(i + 1);
+                    segAppendOut = false;
+                    i++;
+                } else if ((t.equals(">>") || t.equals("1>>")) && i + 1 < segTokens.size()) {
+                    segStdout = segTokens.get(i + 1);
+                    segAppendOut = true;
+                    i++;
+                } else if (t.equals("2>") && i + 1 < segTokens.size()) {
+                    segStderr = segTokens.get(i + 1);
+                    segAppendErr = false;
+                    i++;
+                } else if (t.equals("2>>") && i + 1 < segTokens.size()) {
+                    segStderr = segTokens.get(i + 1);
+                    segAppendErr = true;
+                    i++;
+                } else {
+                    cmdTokens.add(t);
+                }
+            }
+            if (cmdTokens.isEmpty()) continue;
+
+            String cmdName = cmdTokens.get(0);
+            String execPath = findExecutable(cmdName);
+            if (execPath == null) {
+                System.out.println(cmdName + ": command not found");
+                return;
+            }
+
+            ProcessBuilder pb = new ProcessBuilder(cmdTokens);
+            pb.directory(new File(cwd));
+
+            if (idx == 0) {
+                pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
+            }
+
+            if (idx == segments.size() - 1) {
+                if (segStdout != null) {
+                    File f = new File(segStdout);
+                    File parent = f.getParentFile();
+                    if (parent != null && !parent.exists()) parent.mkdirs();
+                    if (segAppendOut) {
+                        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(f));
+                    } else {
+                        pb.redirectOutput(f);
+                    }
+                } else {
+                    pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                }
+            }
+
+            if (segStderr != null) {
+                File f = new File(segStderr);
+                File parent = f.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+                if (segAppendErr) {
+                    pb.redirectError(ProcessBuilder.Redirect.appendTo(f));
+                } else {
+                    pb.redirectError(f);
+                }
+            } else {
+                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            }
+
+            builders.add(pb);
+        }
+
+        if (builders.isEmpty()) return;
+
+        List<Process> procs = ProcessBuilder.startPipeline(builders);
+        for (Process p : procs) {
+            p.waitFor();
         }
     }
 
@@ -565,6 +669,13 @@ public class Main {
                         hasToken = false;
                     }
                     tokens.add("&");
+                } else if (c == '|') {
+                    if (hasToken) {
+                        tokens.add(current.toString());
+                        current.setLength(0);
+                        hasToken = false;
+                    }
+                    tokens.add("|");
                 } else if (Character.isWhitespace(c)) {
                     if (hasToken) {
                         tokens.add(current.toString());
