@@ -1,9 +1,11 @@
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
@@ -18,12 +20,13 @@ public class Main {
     static Map<String, String> completionSpecs = new HashMap<>();
     static Map<Integer, Process> backgroundJobs = new LinkedHashMap<>();
     static Map<Integer, String> backgroundCommands = new LinkedHashMap<>();
+    static List<String> BUILTINS = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete", "jobs");
 
     public static void main(String[] args) throws Exception {
         enableRawMode();
 
         InputStream in = System.in;
-        List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete", "jobs");
+        List<String> builtins = BUILTINS;
         List<String> completables = Arrays.asList("echo", "exit");
         String cwd = System.getProperty("user.dir");
 
@@ -156,7 +159,7 @@ public class Main {
             if (rawTokens.isEmpty()) continue;
 
             if (rawTokens.contains("|")) {
-                runPipeline(rawTokens, cwd);
+                dispatchPipeline(rawTokens, cwd);
                 continue;
             }
 
@@ -356,60 +359,89 @@ public class Main {
         }
     }
 
-    private static void runPipeline(List<String> rawTokens, String cwd) throws Exception {
-        List<List<String>> segments = new ArrayList<>();
-        List<String> currentSegment = new ArrayList<>();
-        for (String t : rawTokens) {
-            if (t.equals("|")) {
-                segments.add(currentSegment);
-                currentSegment = new ArrayList<>();
+    private static class ParsedSegment {
+        List<String> cmdTokens = new ArrayList<>();
+        String stdoutFile;
+        String stderrFile;
+        boolean appendOut;
+        boolean appendErr;
+    }
+
+    private static ParsedSegment parseSegment(List<String> segTokens) {
+        ParsedSegment ps = new ParsedSegment();
+        for (int i = 0; i < segTokens.size(); i++) {
+            String t = segTokens.get(i);
+            if ((t.equals(">") || t.equals("1>")) && i + 1 < segTokens.size()) {
+                ps.stdoutFile = segTokens.get(i + 1);
+                ps.appendOut = false;
+                i++;
+            } else if ((t.equals(">>") || t.equals("1>>")) && i + 1 < segTokens.size()) {
+                ps.stdoutFile = segTokens.get(i + 1);
+                ps.appendOut = true;
+                i++;
+            } else if (t.equals("2>") && i + 1 < segTokens.size()) {
+                ps.stderrFile = segTokens.get(i + 1);
+                ps.appendErr = false;
+                i++;
+            } else if (t.equals("2>>") && i + 1 < segTokens.size()) {
+                ps.stderrFile = segTokens.get(i + 1);
+                ps.appendErr = true;
+                i++;
             } else {
-                currentSegment.add(t);
+                ps.cmdTokens.add(t);
             }
         }
-        segments.add(currentSegment);
+        return ps;
+    }
 
+    private static List<List<String>> splitSegments(List<String> rawTokens) {
+        List<List<String>> segments = new ArrayList<>();
+        List<String> current = new ArrayList<>();
+        for (String t : rawTokens) {
+            if (t.equals("|")) {
+                segments.add(current);
+                current = new ArrayList<>();
+            } else {
+                current.add(t);
+            }
+        }
+        segments.add(current);
+        return segments;
+    }
+
+    private static void dispatchPipeline(List<String> rawTokens, String cwd) throws Exception {
+        List<List<String>> segments = splitSegments(rawTokens);
+
+        boolean hasBuiltin = false;
+        for (List<String> seg : segments) {
+            ParsedSegment ps = parseSegment(seg);
+            if (!ps.cmdTokens.isEmpty() && BUILTINS.contains(ps.cmdTokens.get(0))) {
+                hasBuiltin = true;
+                break;
+            }
+        }
+
+        if (!hasBuiltin) {
+            runExternalPipeline(segments, cwd);
+        } else {
+            runMixedPipeline(segments, cwd);
+        }
+    }
+
+    private static void runExternalPipeline(List<List<String>> segments, String cwd) throws Exception {
         List<ProcessBuilder> builders = new ArrayList<>();
         for (int idx = 0; idx < segments.size(); idx++) {
-            List<String> segTokens = segments.get(idx);
+            ParsedSegment ps = parseSegment(segments.get(idx));
+            if (ps.cmdTokens.isEmpty()) continue;
 
-            String segStdout = null;
-            String segStderr = null;
-            boolean segAppendOut = false;
-            boolean segAppendErr = false;
-            List<String> cmdTokens = new ArrayList<>();
-            for (int i = 0; i < segTokens.size(); i++) {
-                String t = segTokens.get(i);
-                if ((t.equals(">") || t.equals("1>")) && i + 1 < segTokens.size()) {
-                    segStdout = segTokens.get(i + 1);
-                    segAppendOut = false;
-                    i++;
-                } else if ((t.equals(">>") || t.equals("1>>")) && i + 1 < segTokens.size()) {
-                    segStdout = segTokens.get(i + 1);
-                    segAppendOut = true;
-                    i++;
-                } else if (t.equals("2>") && i + 1 < segTokens.size()) {
-                    segStderr = segTokens.get(i + 1);
-                    segAppendErr = false;
-                    i++;
-                } else if (t.equals("2>>") && i + 1 < segTokens.size()) {
-                    segStderr = segTokens.get(i + 1);
-                    segAppendErr = true;
-                    i++;
-                } else {
-                    cmdTokens.add(t);
-                }
-            }
-            if (cmdTokens.isEmpty()) continue;
-
-            String cmdName = cmdTokens.get(0);
+            String cmdName = ps.cmdTokens.get(0);
             String execPath = findExecutable(cmdName);
             if (execPath == null) {
                 System.out.println(cmdName + ": command not found");
                 return;
             }
 
-            ProcessBuilder pb = new ProcessBuilder(cmdTokens);
+            ProcessBuilder pb = new ProcessBuilder(ps.cmdTokens);
             pb.directory(new File(cwd));
 
             if (idx == 0) {
@@ -417,11 +449,11 @@ public class Main {
             }
 
             if (idx == segments.size() - 1) {
-                if (segStdout != null) {
-                    File f = new File(segStdout);
+                if (ps.stdoutFile != null) {
+                    File f = new File(ps.stdoutFile);
                     File parent = f.getParentFile();
                     if (parent != null && !parent.exists()) parent.mkdirs();
-                    if (segAppendOut) {
+                    if (ps.appendOut) {
                         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(f));
                     } else {
                         pb.redirectOutput(f);
@@ -431,11 +463,11 @@ public class Main {
                 }
             }
 
-            if (segStderr != null) {
-                File f = new File(segStderr);
+            if (ps.stderrFile != null) {
+                File f = new File(ps.stderrFile);
                 File parent = f.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
-                if (segAppendErr) {
+                if (ps.appendErr) {
                     pb.redirectError(ProcessBuilder.Redirect.appendTo(f));
                 } else {
                     pb.redirectError(f);
@@ -452,6 +484,186 @@ public class Main {
         List<Process> procs = ProcessBuilder.startPipeline(builders);
         for (Process p : procs) {
             p.waitFor();
+        }
+    }
+
+    private static void runMixedPipeline(List<List<String>> segments, String cwd) throws Exception {
+        List<Process> spawnedProcesses = new ArrayList<>();
+        List<Thread> copyThreads = new ArrayList<>();
+
+        InputStream prevProcessOutput = null;
+        byte[] pendingBytes = null;
+        boolean firstSegment = true;
+
+        for (int idx = 0; idx < segments.size(); idx++) {
+            ParsedSegment ps = parseSegment(segments.get(idx));
+            if (ps.cmdTokens.isEmpty()) continue;
+            String cmdName = ps.cmdTokens.get(0);
+            boolean isLast = (idx == segments.size() - 1);
+            boolean isBuiltinCmd = BUILTINS.contains(cmdName);
+
+            if (isBuiltinCmd) {
+                if (prevProcessOutput != null) {
+                    drainStream(prevProcessOutput);
+                    prevProcessOutput = null;
+                }
+                pendingBytes = null;
+
+                if (isLast) {
+                    PrintStream out = System.out;
+                    FileOutputStream fos = null;
+                    if (ps.stdoutFile != null) {
+                        File f = new File(ps.stdoutFile);
+                        File parent = f.getParentFile();
+                        if (parent != null && !parent.exists()) parent.mkdirs();
+                        fos = new FileOutputStream(f, ps.appendOut);
+                        out = new PrintStream(fos);
+                    }
+                    runBuiltinForPipeline(ps.cmdTokens, out, cwd);
+                    out.flush();
+                    if (fos != null) out.close();
+                } else {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    PrintStream out = new PrintStream(baos);
+                    runBuiltinForPipeline(ps.cmdTokens, out, cwd);
+                    out.flush();
+                    pendingBytes = baos.toByteArray();
+                }
+                firstSegment = false;
+                continue;
+            }
+
+            String execPath = findExecutable(cmdName);
+            if (execPath == null) {
+                System.out.println(cmdName + ": command not found");
+                return;
+            }
+
+            ProcessBuilder pb = new ProcessBuilder(ps.cmdTokens);
+            pb.directory(new File(cwd));
+
+            if (firstSegment && pendingBytes == null && prevProcessOutput == null) {
+                pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
+            } else {
+                pb.redirectInput(ProcessBuilder.Redirect.PIPE);
+            }
+
+            if (isLast) {
+                if (ps.stdoutFile != null) {
+                    File f = new File(ps.stdoutFile);
+                    File parent = f.getParentFile();
+                    if (parent != null && !parent.exists()) parent.mkdirs();
+                    if (ps.appendOut) {
+                        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(f));
+                    } else {
+                        pb.redirectOutput(f);
+                    }
+                } else {
+                    pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                }
+            } else {
+                pb.redirectOutput(ProcessBuilder.Redirect.PIPE);
+            }
+
+            if (ps.stderrFile != null) {
+                File f = new File(ps.stderrFile);
+                File parent = f.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+                if (ps.appendErr) {
+                    pb.redirectError(ProcessBuilder.Redirect.appendTo(f));
+                } else {
+                    pb.redirectError(f);
+                }
+            } else {
+                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            }
+
+            Process proc = pb.start();
+            spawnedProcesses.add(proc);
+
+            if (!firstSegment || pendingBytes != null || prevProcessOutput != null) {
+                final byte[] dataToWrite = pendingBytes;
+                final InputStream streamToCopy = prevProcessOutput;
+                final OutputStream procStdin = proc.getOutputStream();
+                Thread t = new Thread(() -> {
+                    try {
+                        if (dataToWrite != null) {
+                            procStdin.write(dataToWrite);
+                        } else if (streamToCopy != null) {
+                            byte[] buf = new byte[4096];
+                            int n;
+                            while ((n = streamToCopy.read(buf)) != -1) {
+                                procStdin.write(buf, 0, n);
+                            }
+                        }
+                        procStdin.close();
+                    } catch (Exception e) {
+                    }
+                });
+                t.start();
+                copyThreads.add(t);
+            }
+
+            pendingBytes = null;
+            if (!isLast) {
+                prevProcessOutput = proc.getInputStream();
+            } else {
+                prevProcessOutput = null;
+            }
+            firstSegment = false;
+        }
+
+        for (Process p : spawnedProcesses) {
+            p.waitFor();
+        }
+        for (Thread t : copyThreads) {
+            t.join();
+        }
+    }
+
+    private static void drainStream(InputStream in) {
+        try {
+            byte[] buf = new byte[4096];
+            while (in.read(buf) != -1) {
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    private static void runBuiltinForPipeline(List<String> tokens, PrintStream out, String cwd) {
+        String command = tokens.get(0);
+        if (command.equals("echo")) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i < tokens.size(); i++) {
+                if (i > 1) sb.append(" ");
+                sb.append(tokens.get(i));
+            }
+            out.println(sb.toString());
+        } else if (command.equals("pwd")) {
+            out.println(cwd);
+        } else if (command.equals("type")) {
+            if (tokens.size() >= 2) {
+                String target = tokens.get(1);
+                if (BUILTINS.contains(target)) {
+                    out.println(target + " is a shell builtin");
+                } else {
+                    String path = findExecutable(target);
+                    if (path != null) {
+                        out.println(target + " is " + path);
+                    } else {
+                        out.println(target + ": not found");
+                    }
+                }
+            }
+        } else if (command.equals("complete")) {
+            if (tokens.size() >= 3 && tokens.get(1).equals("-p")) {
+                String cmd = tokens.get(2);
+                if (completionSpecs.containsKey(cmd)) {
+                    out.println("complete -C '" + completionSpecs.get(cmd) + "' " + cmd);
+                } else {
+                    out.println("complete: " + cmd + ": no completion specification");
+                }
+            }
         }
     }
 
