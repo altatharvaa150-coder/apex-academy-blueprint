@@ -19,7 +19,7 @@ public class Main {
         enableRawMode();
 
         InputStream in = System.in;
-        List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete");
+        List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete", "jobs");
         List<String> completables = Arrays.asList("echo", "exit");
         String cwd = System.getProperty("user.dir");
 
@@ -264,6 +264,8 @@ public class Main {
                     String cmd = tokens.get(2);
                     completionSpecs.remove(cmd);
                 }
+            } else if (command.equals("jobs")) {
+                // will be implemented in later stages
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
