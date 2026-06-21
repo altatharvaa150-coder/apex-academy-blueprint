@@ -11,9 +11,13 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 public class Main {
     static Map<String, String> completionSpecs = new HashMap<>();
+    static Map<Integer, Process> backgroundJobs = new LinkedHashMap<>();
+    static Map<Integer, String> backgroundCommands = new LinkedHashMap<>();
+    static int nextJobNumber = 1;
 
     public static void main(String[] args) throws Exception {
         enableRawMode();
@@ -142,6 +146,13 @@ public class Main {
             List<String> rawTokens = parseInput(input);
             if (rawTokens.isEmpty()) continue;
 
+            boolean runInBackground = false;
+            if (!rawTokens.isEmpty() && rawTokens.get(rawTokens.size() - 1).equals("&")) {
+                runInBackground = true;
+                rawTokens.remove(rawTokens.size() - 1);
+            }
+            if (rawTokens.isEmpty()) continue;
+
             String stdoutFile = null;
             String stderrFile = null;
             boolean appendStdout = false;
@@ -265,7 +276,7 @@ public class Main {
                     completionSpecs.remove(cmd);
                 }
             } else if (command.equals("jobs")) {
-                // will be implemented in later stages
+                // full listing implemented in later stages
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
@@ -297,7 +308,14 @@ public class Main {
                         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
                     }
                     Process p = pb.start();
-                    p.waitFor();
+                    if (runInBackground) {
+                        int jobNum = nextJobNumber++;
+                        backgroundJobs.put(jobNum, p);
+                        backgroundCommands.put(jobNum, String.join(" ", tokens));
+                        System.out.println("[" + jobNum + "] " + p.pid());
+                    } else {
+                        p.waitFor();
+                    }
                 } else {
                     System.out.println(command + ": command not found");
                 }
@@ -484,6 +502,13 @@ public class Main {
                     } else {
                         tokens.add(prefix + ">");
                     }
+                } else if (c == '&') {
+                    if (hasToken) {
+                        tokens.add(current.toString());
+                        current.setLength(0);
+                        hasToken = false;
+                    }
+                    tokens.add("&");
                 } else if (Character.isWhitespace(c)) {
                     if (hasToken) {
                         tokens.add(current.toString());
