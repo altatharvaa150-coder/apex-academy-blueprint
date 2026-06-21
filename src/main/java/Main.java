@@ -16,7 +16,7 @@ public class Main {
         List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd");
         List<String> completables = Arrays.asList("echo", "exit");
         String cwd = System.getProperty("user.dir");
-
+List<String> builtins = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete");
         while (true) {
             System.out.print("$ ");
             System.out.flush();
