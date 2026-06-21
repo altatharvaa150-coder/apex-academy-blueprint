@@ -49,24 +49,17 @@ public class Main {
 
                     List<String> matches;
                     if (isArg) {
-                        String[] words = full.split("\\s+");
+                        String[] words = full.trim().split("\\s+");
                         String cmdName = words[0];
                         if (completionSpecs.containsKey(cmdName)) {
                             String currentWord = prefix;
                             String prevWord = "";
-                            if (words.length >= 2 && !full.endsWith(" ") && full.contains(" ")) {
-                                if (words.length >= 2) {
-                                    prevWord = words[words.length - 1].equals(currentWord) && words.length >= 3 ? words[words.length - 2] : "";
-                                    if (words.length == 2 && !currentWord.isEmpty()) {
-                                        prevWord = cmdName;
-                                    } else if (words.length > 2 && !currentWord.isEmpty()) {
-                                        prevWord = words[words.length - 2];
-                                    }
-                                }
-                            } else if (full.endsWith(" ")) {
-                                prevWord = words[words.length - 1];
+                            String beforeCursor = full.substring(0, lastSpace);
+                            String[] prevWords = beforeCursor.trim().split("\\s+");
+                            if (prevWords.length > 0) {
+                                prevWord = prevWords[prevWords.length - 1];
                             }
-                            matches = runCompleter(completionSpecs.get(cmdName), cmdName, currentWord, prevWord);
+                            matches = runCompleter(completionSpecs.get(cmdName), cmdName, currentWord, prevWord, full);
                         } else {
                             matches = findFileMatches(prefix, cwd);
                         }
@@ -307,10 +300,12 @@ public class Main {
         }
     }
 
-    private static List<String> runCompleter(String script, String cmdName, String currentWord, String prevWord) {
+    private static List<String> runCompleter(String script, String cmdName, String currentWord, String prevWord, String compLine) {
         List<String> results = new ArrayList<>();
         try {
             ProcessBuilder pb = new ProcessBuilder(script, cmdName, currentWord, prevWord);
+            pb.environment().put("COMP_LINE", compLine);
+            pb.environment().put("COMP_POINT", String.valueOf(compLine.length()));
             pb.redirectError(ProcessBuilder.Redirect.INHERIT);
             Process p = pb.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
