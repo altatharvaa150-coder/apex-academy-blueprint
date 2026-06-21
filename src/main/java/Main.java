@@ -7,8 +7,12 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Main {
+    static Map<String, String> completionSpecs = new HashMap<>();
+
     public static void main(String[] args) throws Exception {
         enableRawMode();
 
@@ -227,7 +231,18 @@ public class Main {
                 if (fosOut != null) out.close();
                 if (fosErr != null) err.close();
             } else if (command.equals("complete")) {
-                // will be implemented in later stages
+                if (tokens.size() >= 3 && tokens.get(1).equals("-p")) {
+                    String cmd = tokens.get(2);
+                    if (completionSpecs.containsKey(cmd)) {
+                        System.out.println("complete -C '" + completionSpecs.get(cmd) + "' " + cmd);
+                    } else {
+                        System.out.println("complete: " + cmd + ": no completion specification");
+                    }
+                } else if (tokens.size() >= 4 && tokens.get(1).equals("-C")) {
+                    String script = tokens.get(2);
+                    String cmd = tokens.get(3);
+                    completionSpecs.put(cmd, script);
+                }
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
