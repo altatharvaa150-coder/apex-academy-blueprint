@@ -54,10 +54,15 @@ public class Main {
                         lastTabRang = false;
                     } else if (matches.size() == 1) {
                         String match = matches.get(0);
-                        String rest = match.substring(prefix.length()) + " ";
-                        System.out.print(rest);
+                        String suffix;
+                        if (isArg && isDirectory(match, cwd)) {
+                            suffix = match.substring(prefix.length()) + "/";
+                        } else {
+                            suffix = match.substring(prefix.length()) + " ";
+                        }
+                        System.out.print(suffix);
                         System.out.flush();
-                        buf.append(rest);
+                        buf.append(suffix);
                         lastTabRang = false;
                     } else {
                         String lcp = longestCommonPrefix(matches);
@@ -310,6 +315,16 @@ public class Main {
             }
         }
         return new ArrayList<>(matches);
+    }
+
+    private static boolean isDirectory(String match, String cwd) {
+        File f;
+        if (match.startsWith("/")) {
+            f = new File(match);
+        } else {
+            f = new File(cwd, match);
+        }
+        return f.isDirectory();
     }
 
     private static String longestCommonPrefix(List<String> list) {
