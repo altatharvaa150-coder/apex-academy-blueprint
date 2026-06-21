@@ -276,7 +276,14 @@ public class Main {
                     completionSpecs.remove(cmd);
                 }
             } else if (command.equals("jobs")) {
-                // full listing implemented in later stages
+                for (Map.Entry<Integer, Process> entry : backgroundJobs.entrySet()) {
+                    int jobNum = entry.getKey();
+                    Process p = entry.getValue();
+                    String status = p.isAlive() ? "Running" : "Done";
+                    String cmdStr = backgroundCommands.get(jobNum) + " &";
+                    String padded = String.format("%-23s", status);
+                    System.out.println("[" + jobNum + "]+  " + padded + " " + cmdStr);
+                }
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
