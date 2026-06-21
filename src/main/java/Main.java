@@ -28,6 +28,8 @@ public class Main {
         String cwd = System.getProperty("user.dir");
 
         while (true) {
+            reapJobs();
+
             System.out.print("$ ");
             System.out.flush();
 
@@ -276,16 +278,13 @@ public class Main {
                     completionSpecs.remove(cmd);
                 }
             } else if (command.equals("jobs")) {
+                reapJobs();
                 List<Integer> jobNums = new ArrayList<>(backgroundJobs.keySet());
                 int currentJob = jobNums.isEmpty() ? -1 : jobNums.get(jobNums.size() - 1);
                 int previousJob = jobNums.size() >= 2 ? jobNums.get(jobNums.size() - 2) : -1;
-                List<Integer> toRemove = new ArrayList<>();
                 for (int jobNum : jobNums) {
-                    Process p = backgroundJobs.get(jobNum);
-                    boolean alive = p.isAlive();
-                    String status = alive ? "Running" : "Done";
-                    String cmdStr = backgroundCommands.get(jobNum) + (alive ? " &" : "");
-                    String padded = String.format("%-23s", status);
+                    String cmdStr = backgroundCommands.get(jobNum) + " &";
+                    String padded = String.format("%-23s", "Running");
                     String marker;
                     if (jobNum == currentJob) {
                         marker = "+";
@@ -295,13 +294,6 @@ public class Main {
                         marker = " ";
                     }
                     System.out.println("[" + jobNum + "]" + marker + "  " + padded + " " + cmdStr);
-                    if (!alive) {
-                        toRemove.add(jobNum);
-                    }
-                }
-                for (int jobNum : toRemove) {
-                    backgroundJobs.remove(jobNum);
-                    backgroundCommands.remove(jobNum);
                 }
             } else {
                 String path = findExecutable(command);
@@ -346,6 +338,34 @@ public class Main {
                     System.out.println(command + ": command not found");
                 }
             }
+        }
+    }
+
+    private static void reapJobs() {
+        List<Integer> jobNums = new ArrayList<>(backgroundJobs.keySet());
+        int currentJob = jobNums.isEmpty() ? -1 : jobNums.get(jobNums.size() - 1);
+        int previousJob = jobNums.size() >= 2 ? jobNums.get(jobNums.size() - 2) : -1;
+        List<Integer> toRemove = new ArrayList<>();
+        for (int jobNum : jobNums) {
+            Process p = backgroundJobs.get(jobNum);
+            if (!p.isAlive()) {
+                String cmdStr = backgroundCommands.get(jobNum);
+                String padded = String.format("%-23s", "Done");
+                String marker;
+                if (jobNum == currentJob) {
+                    marker = "+";
+                } else if (jobNum == previousJob) {
+                    marker = "-";
+                } else {
+                    marker = " ";
+                }
+                System.out.println("[" + jobNum + "]" + marker + "  " + padded + " " + cmdStr);
+                toRemove.add(jobNum);
+            }
+        }
+        for (int jobNum : toRemove) {
+            backgroundJobs.remove(jobNum);
+            backgroundCommands.remove(jobNum);
         }
     }
 
