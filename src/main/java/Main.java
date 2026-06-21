@@ -12,12 +12,12 @@ import java.util.TreeSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Collections;
 
 public class Main {
     static Map<String, String> completionSpecs = new HashMap<>();
     static Map<Integer, Process> backgroundJobs = new LinkedHashMap<>();
     static Map<Integer, String> backgroundCommands = new LinkedHashMap<>();
-    static int nextJobNumber = 1;
 
     public static void main(String[] args) throws Exception {
         enableRawMode();
@@ -337,7 +337,7 @@ public class Main {
                     }
                     Process p = pb.start();
                     if (runInBackground) {
-                        int jobNum = nextJobNumber++;
+                        int jobNum = backgroundJobs.isEmpty() ? 1 : (Collections.max(backgroundJobs.keySet()) + 1);
                         backgroundJobs.put(jobNum, p);
                         backgroundCommands.put(jobNum, String.join(" ", tokens));
                         System.out.println("[" + jobNum + "] " + p.pid());
