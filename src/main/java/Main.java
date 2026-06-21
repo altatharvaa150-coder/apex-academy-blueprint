@@ -276,13 +276,23 @@ public class Main {
                     completionSpecs.remove(cmd);
                 }
             } else if (command.equals("jobs")) {
-                for (Map.Entry<Integer, Process> entry : backgroundJobs.entrySet()) {
-                    int jobNum = entry.getKey();
-                    Process p = entry.getValue();
+                List<Integer> jobNums = new ArrayList<>(backgroundJobs.keySet());
+                int currentJob = jobNums.isEmpty() ? -1 : jobNums.get(jobNums.size() - 1);
+                int previousJob = jobNums.size() >= 2 ? jobNums.get(jobNums.size() - 2) : -1;
+                for (int jobNum : jobNums) {
+                    Process p = backgroundJobs.get(jobNum);
                     String status = p.isAlive() ? "Running" : "Done";
                     String cmdStr = backgroundCommands.get(jobNum) + " &";
                     String padded = String.format("%-23s", status);
-                    System.out.println("[" + jobNum + "]+  " + padded + " " + cmdStr);
+                    String marker;
+                    if (jobNum == currentJob) {
+                        marker = "+";
+                    } else if (jobNum == previousJob) {
+                        marker = "-";
+                    } else {
+                        marker = " ";
+                    }
+                    System.out.println("[" + jobNum + "]" + marker + "  " + padded + " " + cmdStr);
                 }
             } else {
                 String path = findExecutable(command);
