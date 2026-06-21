@@ -260,6 +260,9 @@ public class Main {
                     String script = tokens.get(2);
                     String cmd = tokens.get(3);
                     completionSpecs.put(cmd, script);
+                } else if (tokens.size() >= 3 && tokens.get(1).equals("-r")) {
+                    String cmd = tokens.get(2);
+                    completionSpecs.remove(cmd);
                 }
             } else {
                 String path = findExecutable(command);
