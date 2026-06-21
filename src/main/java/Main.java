@@ -2,6 +2,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
@@ -47,7 +49,12 @@ public class Main {
 
                     List<String> matches;
                     if (isArg) {
-                        matches = findFileMatches(prefix, cwd);
+                        String cmdName = full.substring(0, full.indexOf(' ')).trim();
+                        if (completionSpecs.containsKey(cmdName)) {
+                            matches = runCompleter(completionSpecs.get(cmdName), prefix);
+                        } else {
+                            matches = findFileMatches(prefix, cwd);
+                        }
                     } else {
                         matches = findCommandMatches(prefix, completables);
                     }
@@ -59,8 +66,12 @@ public class Main {
                     } else if (matches.size() == 1) {
                         String match = matches.get(0);
                         String suffix;
-                        if (isArg && isDirectory(match, cwd)) {
-                            suffix = match.substring(prefix.length()) + "/";
+                        if (!isArg || !completionSpecs.containsKey(full.substring(0, full.indexOf(' ')).trim())) {
+                            if (isArg && isDirectory(match, cwd)) {
+                                suffix = match.substring(prefix.length()) + "/";
+                            } else {
+                                suffix = match.substring(prefix.length()) + " ";
+                            }
                         } else {
                             suffix = match.substring(prefix.length()) + " ";
                         }
@@ -82,7 +93,7 @@ public class Main {
                             for (String m : matches) {
                                 int sl = m.lastIndexOf('/');
                                 String name = sl >= 0 ? m.substring(sl + 1) : m;
-                                if (isArg && isDirectory(m, cwd)) {
+                                if (isArg && !completionSpecs.containsKey(full.substring(0, full.indexOf(' ')).trim()) && isDirectory(m, cwd)) {
                                     name = name + "/";
                                 }
                                 display.add(name);
@@ -280,6 +291,26 @@ public class Main {
                 }
             }
         }
+    }
+
+    private static List<String> runCompleter(String script, String prefix) {
+        List<String> results = new ArrayList<>();
+        try {
+            ProcessBuilder pb = new ProcessBuilder(script);
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            Process p = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (!line.isEmpty() && line.startsWith(prefix)) {
+                    results.add(line);
+                }
+            }
+            p.waitFor();
+        } catch (Exception e) {
+        }
+        return results;
     }
 
     private static List<String> findCommandMatches(String prefix, List<String> completables) {
