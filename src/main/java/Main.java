@@ -21,6 +21,7 @@ public class Main {
     static Map<Integer, Process> backgroundJobs = new LinkedHashMap<>();
     static Map<Integer, String> backgroundCommands = new LinkedHashMap<>();
     static List<String> BUILTINS = Arrays.asList("echo", "exit", "type", "pwd", "cd", "complete", "jobs", "history");
+    static List<String> historyList = new ArrayList<>();
 
     public static void main(String[] args) throws Exception {
         enableRawMode();
@@ -150,6 +151,8 @@ public class Main {
 
             List<String> rawTokens = parseInput(input);
             if (rawTokens.isEmpty()) continue;
+
+            historyList.add(input.trim());
 
             boolean runInBackground = false;
             if (!rawTokens.isEmpty() && rawTokens.get(rawTokens.size() - 1).equals("&")) {
@@ -314,7 +317,9 @@ public class Main {
                     backgroundCommands.remove(jobNum);
                 }
             } else if (command.equals("history")) {
-                // full listing implemented in later stages
+                for (int i = 0; i < historyList.size(); i++) {
+                    System.out.printf("%5d  %s%n", i + 1, historyList.get(i));
+                }
             } else {
                 String path = findExecutable(command);
                 if (path != null) {
