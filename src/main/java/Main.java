@@ -74,15 +74,19 @@ public class Main {
                             lastTabRang = false;
                         } else if (lastTabRang && full.equals(lastTabPrefix)) {
                             System.out.print("\n");
-                            List<String> names = new ArrayList<>();
+                            List<String> display = new ArrayList<>();
                             for (String m : matches) {
                                 int sl = m.lastIndexOf('/');
-                                names.add(sl >= 0 ? m.substring(sl + 1) : m);
+                                String name = sl >= 0 ? m.substring(sl + 1) : m;
+                                if (isArg && isDirectory(m, cwd)) {
+                                    name = name + "/";
+                                }
+                                display.add(name);
                             }
                             StringBuilder line = new StringBuilder();
-                            for (int i = 0; i < names.size(); i++) {
+                            for (int i = 0; i < display.size(); i++) {
                                 if (i > 0) line.append("  ");
-                                line.append(names.get(i));
+                                line.append(display.get(i));
                             }
                             System.out.println(line.toString());
                             System.out.print("$ " + full);
